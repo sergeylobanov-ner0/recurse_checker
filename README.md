@@ -43,15 +43,8 @@ Current example:
 ```json
 [
   {
-    "name": "MOEX Main Page",
-    "url": "https://www.moex.com/",
-    "expected_status_min": 200,
-    "expected_status_max": 399,
-    "timeout": 10
-  },
-  {
-    "name": "MOEX Passport",
-    "url": "https://passport.moex.com/",
+    "name": "Example Site",
+    "url": "https://example.com/",
     "expected_status_min": 200,
     "expected_status_max": 399,
     "timeout": 10
