@@ -1,0 +1,16 @@
+[
+  {
+    "name": "Example Website",
+    "url": "https://example.com/",
+    "expected_status_min": 200,
+    "expected_status_max": 399,
+    "timeout": 10
+  },
+  {
+    "name": "Example Login Page",
+    "url": "https://example.com/login",
+    "expected_status_min": 200,
+    "expected_status_max": 399,
+    "timeout": 10
+  }
+]
