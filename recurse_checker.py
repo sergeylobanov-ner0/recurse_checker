@@ -11,7 +11,7 @@ import logging
 import os
 import time
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -223,6 +223,18 @@ def format_recovered_message(result: CheckResult) -> str:
     )
 
 
+def parse_iso_datetime(value: Optional[str]) -> Optional[datetime]:
+    """Parse ISO datetime from state file."""
+    if not value:
+        return None
+
+    try:
+        return datetime.fromisoformat(value)
+    except ValueError:
+        logging.warning("Could not parse datetime value from state: %s", value)
+        return None
+
+
 def process_result(
     resource: Dict[str, Any],
     result: CheckResult,
@@ -238,10 +250,14 @@ def process_result(
             "last_error": None,
             "last_check_time": None,
             "alert_sent": False,
+            "problem_started_at": None,
+            "last_alert_time": None,
         },
     )
 
     current_state = "OK" if result.success else "PROBLEM"
+    current_check_time = parse_iso_datetime(result.checked_at)
+    last_alert_time = parse_iso_datetime(previous_state.get("last_alert_time"))
 
     logging.info(
         "Checked resource | name=%s | url=%s | status_code=%s | response_time=%s | error=%s",
@@ -252,18 +268,41 @@ def process_result(
         result.error,
     )
 
-    if current_state == "PROBLEM" and not previous_state.get("alert_sent", False):
+    should_repeat_alert = (
+        current_state == "PROBLEM"
+        and previous_state.get("current_state") == "PROBLEM"
+        and last_alert_time is not None
+        and current_check_time is not None
+        and current_check_time - last_alert_time >= timedelta(seconds=CHECK_INTERVAL_SECONDS)
+    )
+
+    if current_state == "PROBLEM" and (
+        not previous_state.get("alert_sent", False) or should_repeat_alert
+    ):
         message = format_alert_message(result)
         send_telegram_message(message)
         logging.warning("Alert sent for resource: %s", result.resource_name)
         alert_sent = True
+        problem_started_at = previous_state.get("problem_started_at") or result.checked_at
+        last_alert_time_value = result.checked_at
     elif current_state == "OK" and previous_state.get("current_state") == "PROBLEM":
         message = format_recovered_message(result)
         send_telegram_message(message)
         logging.info("Recovered message sent for resource: %s", result.resource_name)
         alert_sent = False
+        problem_started_at = None
+        last_alert_time_value = None
     else:
         alert_sent = current_state == "PROBLEM" and previous_state.get("alert_sent", False)
+        problem_started_at = (
+            previous_state.get("problem_started_at") if current_state == "PROBLEM" else None
+        )
+        last_alert_time_value = (
+            previous_state.get("last_alert_time") if current_state == "PROBLEM" else None
+        )
+
+        if current_state == "PROBLEM" and not problem_started_at:
+            problem_started_at = result.checked_at
 
     state[resource_key] = {
         "current_state": current_state,
@@ -271,6 +310,8 @@ def process_result(
         "last_error": result.error,
         "last_check_time": result.checked_at,
         "alert_sent": alert_sent,
+        "problem_started_at": problem_started_at,
+        "last_alert_time": last_alert_time_value,
     }
 
 
