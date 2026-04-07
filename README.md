@@ -2,16 +2,16 @@
 
 Simple Python script for external monitoring of web resources with Telegram notifications.
 
-The script checks one or more websites from the outside, stores the last known state in JSON, writes logs to console and file, sends one alert when a resource becomes unavailable, and sends a separate recovery message when the resource becomes available again.
+The script checks one or more websites from the outside, stores the last known state in JSON, writes logs to console and file, sends one alert when a resource becomes unavailable, repeats alerts every 15 minutes while the problem continues, and sends a separate recovery message when the resource becomes available again.
 
 ## What This Project Does
 
-- Checks configured web resources every 15 minutes
+- Checks configured web resources every 1 minute
 - Uses HTTP GET with `requests`
 - Treats HTTP `200-399` as `OK`
 - Treats HTTP `400-599`, timeout, DNS error, connection error, SSL error, and other request exceptions as `PROBLEM`
 - Sends Telegram alert on the first failed check
-- Does not spam repeated alerts while the resource is still unavailable
+- Repeats Telegram alert every 15 minutes while the resource is still unavailable
 - Sends a recovery message when the resource comes back
 - Stores state between restarts in `monitor_state.json`
 - Writes logs to console and `monitor.log`
@@ -43,8 +43,15 @@ Current example:
 ```json
 [
   {
-    "name": "Example Site",
-    "url": "https://example.com/",
+    "name": "MOEX Main Page",
+    "url": "https://www.moex.com/",
+    "expected_status_min": 200,
+    "expected_status_max": 399,
+    "timeout": 10
+  },
+  {
+    "name": "MOEX Passport",
+    "url": "https://passport.moex.com/",
     "expected_status_min": 200,
     "expected_status_max": 399,
     "timeout": 10
@@ -123,7 +130,7 @@ The script stores the last known state of each resource in `monitor_state.json`.
 This allows it to:
 
 - remember whether the resource was already in `PROBLEM`
-- avoid repeated alerts after restart
+- track the last alert time for repeated notifications
 - send `RECOVERED` only when there is a real transition from `PROBLEM` to `OK`
 
 ## Logging
